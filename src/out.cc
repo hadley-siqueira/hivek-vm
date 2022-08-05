@@ -29,10 +29,8 @@ public:
     }
 
     void dump(int n) {
-        auto i = 0;
-        while (i < n) {
+        for (auto i = 0; i < n; ++i) {
             printf("%02x\n", mem[i]);
-            i++;
         }
     }
 

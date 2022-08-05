@@ -25,10 +25,8 @@ class HivekMem:
     def dump : void
         @n : int
 
-        i = 0
-        while i < n:
+        for i = 0; i < n; ++i:
             printf("%02x\n", mem[i])
-            i++
 
     def read32 : u64
         @addr : u64
@@ -169,12 +167,9 @@ class HivekVM:
         mem.read_bin(path)
 
     def dump : void
-        i = 0
-
-        while i < 32:
+        for i = 0; i < 32; ++i:
             # C stuff
             printf("regs[%i] = 0x%016lx\n", i, regs[i])
-            i = i + 1
 
         mem.dump(10)
 
