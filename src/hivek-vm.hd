@@ -1,22 +1,26 @@
-class HivekVM:
-    ip   : u64
-    regs : u64
-    mem  : u8*
-    run_flag : bool
+class HivekMem:
+    mem : u8*
 
     def initialize : void
-        ip = 0
-        mem = new u8[1024 * 1024 * 8]
-        write32(0, 0xffabcdef)
+        @n : int
 
-        # C stuff
-        printf("v: %x\n", read32(0))
+        mem = new u8[n]
 
-    def print_byte : void
-        @byte : u8
+    def read_bin : void
+        @path : char*
 
-        # C stuff
-        printf("%x\n", byte)
+        var c : int
+        f = fopen(path, "r")
+
+        i = 0
+        while true:
+            c = fgetc(f)
+
+            if c == EOF:
+                break
+
+            mem[i] = c
+            i = i + 1
 
     def read32 : u64
         @addr : u64
@@ -42,12 +46,29 @@ class HivekVM:
         mem[addr + 2] = (value >>  8) & 0x0ff
         mem[addr + 3] = (value >>  0) & 0x0ff
 
+class HivekVM:
+    ip   : u64
+    regs : u64*
+    mem  : HivekMem
+    run_flag : bool
+
+    def initialize : void
+        ip = 0
+        mem.initialize(8 * 1024 * 1024) 
+        regs = new u64[32]
+
+    def print_byte : void
+        @byte : u8
+
+        # C stuff
+        printf("%x\n", byte)
+
     def run : void
         while run_flag:
             execute_instruction()
 
     def execute_instruction : void
-        inst = read32(ip)
+        inst = mem.read32(ip)
 
         if is_16bit_instruction(inst):
             exec_16bit(inst)
@@ -86,41 +107,46 @@ class HivekVM:
         FUNCT_32_SH = 0
         FUNCT_32_MASK = 0x7f
         RA_32_MASK = 0x1f
+        RB_32_MASK = 0x1f
+        RC_32_MASK = 0x1f
         RA_32_SH = 18
+        RB_32_SH = 13
+        RC_32_SH = 8
         FUNCT_32_ADD_64 = 0
+        FUNCT_32_SUB_64 = 1
+        IMMD13_32_SH = 0
+        IMMD13_32_MASK = 0x1FFF
+
+        OPCODE_32_ADDI_64 = 1
 
         opcode = (inst >> OPCODE_32_SH) & OPCODE_32_MASK
         funct  = (inst >> FUNCT_32_SH) & FUNCT_32_MASK
         ra     = (inst >> RA_32_SH) & RA_32_MASK
-        rb     = (inst >> RA_32_SH) & RA_32_MASK
-        rc     = (inst >> RA_32_SH) & RA_32_MASK
+        rb     = (inst >> RB_32_SH) & RB_32_MASK
+        rc     = (inst >> RC_32_SH) & RC_32_MASK
+        immd   = (inst >> IMMD13_32_SH) & IMMD13_32_MASK
 
         if opcode == 0:
             if funct == FUNCT_32_ADD_64:
                 regs[rc] = regs[ra] + regs[rb]
                 ip += 4
+            elif funct == FUNCT_32_SUB_64:
+                regs[rc] = regs[ra] - regs[rb]
+                ip += 4
+        elif opcode == OPCODE_32_ADDI_64:
+            regs[rb] = regs[ra] + immd
 
     def read_bin : void
         @path : char*
 
-        var c : int
-        f = fopen(path, "r")
-
-        i = 0
-        while true:
-            c = fgetc(f)
-
-            if c == EOF:
-                break
-
-            mem[i] = c
-            i = i + 1
+        mem.read_bin(path)
 
     def dump : void
         i = 0
 
-        while i < 10:
-            print_byte(mem[i])
+        while i < 32:
+            # C stuff
+            printf("regs[%i] = 0x%016lx\n", i, regs[i])
             i = i + 1
 
 def main : int
