@@ -10,7 +10,7 @@ class HivekMem:
         @path : char*
 
         var c : int
-        f = fopen(path, "r")
+        f = fopen(path, "rb")
 
         i = 0
         while true:
@@ -21,6 +21,14 @@ class HivekMem:
 
             mem[i] = c
             i = i + 1
+
+    def dump : void
+        @n : int
+
+        i = 0
+        while i < n:
+            printf("%02x\n", mem[i])
+            i++
 
     def read32 : u64
         @addr : u64
@@ -56,6 +64,7 @@ class HivekVM:
         ip = 0
         mem.initialize(8 * 1024 * 1024) 
         regs = new u64[32]
+        run_flag = true
 
     def print_byte : void
         @byte : u8
@@ -66,28 +75,36 @@ class HivekVM:
     def run : void
         while run_flag:
             execute_instruction()
+            printf("\nip = %lx\r", ip)
 
     def execute_instruction : void
         inst = mem.read32(ip)
+        run_flag = false
 
         if is_16bit_instruction(inst):
             exec_16bit(inst)
         elif is_24bit_instruction(inst):
             exec_24bit(inst)
-        else:
+        elif is_32bit_instruction(inst):
             exec_32bit(inst)
+            run_flag = true
 
     def is_16bit_instruction : bool
         @inst : u32
 
-        return (inst >> 30) == 0
-            || (inst >> 30) == 1
-            || (inst >> 30) == 2
+        return (inst >> 30) & 0x3 == 0
+            || (inst >> 30) & 0x3 == 1
+            || (inst >> 30) & 0x3 == 2
 
     def is_24bit_instruction : bool
         @inst : u32
 
         return (inst >> 24) == 6
+
+    def is_32bit_instruction : bool
+        @inst : u32
+
+        return (inst >> 29) & 0x7 == 7
 
     def exec_16bit : void
         @inst : u32
@@ -102,7 +119,7 @@ class HivekVM:
     def exec_32bit : void
         @inst : u32
 
-        OPCODE_32_SH = 32 - 3 - 6
+        OPCODE_32_SH = 23
         OPCODE_32_MASK = 0x3F
         FUNCT_32_SH = 0
         FUNCT_32_MASK = 0x7f
@@ -126,6 +143,13 @@ class HivekVM:
         rc     = (inst >> RC_32_SH) & RC_32_MASK
         immd   = (inst >> IMMD13_32_SH) & IMMD13_32_MASK
 
+        printf("op = %i\n", opcode)
+        printf("funct = %i\n", funct)
+        printf("ra = %i\n", ra)
+        printf("rb = %i\n", rb)
+        printf("rc = %i\n", rc)
+        printf("immd = %i\n", immd)
+
         if opcode == 0:
             if funct == FUNCT_32_ADD_64:
                 regs[rc] = regs[ra] + regs[rb]
@@ -135,6 +159,9 @@ class HivekVM:
                 ip += 4
         elif opcode == OPCODE_32_ADDI_64:
             regs[rb] = regs[ra] + immd
+            ip += 4
+        else:
+            printf("none\n")
 
     def read_bin : void
         @path : char*
@@ -149,8 +176,11 @@ class HivekVM:
             printf("regs[%i] = 0x%016lx\n", i, regs[i])
             i = i + 1
 
+        mem.dump(10)
+
 def main : int
     v = HivekVM()
     v.initialize()
     v.read_bin('init.bin')
+    v.run()
     v.dump()
